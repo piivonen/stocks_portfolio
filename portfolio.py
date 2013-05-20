@@ -2,11 +2,15 @@ import sqlite3
 import urllib.request
 import helpers
 from helpers import menu
+import logging
 
 DB = "portfolio.db"
 conn = sqlite3.connect(DB)
 cursor = conn.cursor()
 fh = open('portfolio.log', 'a')
+
+logging.basicConfig(filename='portfolio.log',level=logging.DEBUG,format='%(asctime)s %(message)s', datefmt='%m/%d/%Y %I:%M:%S %p')
+logging.info('Logging STARTED')
 
 def price(ticker):
     url = 'http://download.finance.yahoo.com/d/quotes.csv?s='+ticker+'&f=nsl1op&e=.csv'
@@ -53,10 +57,10 @@ def buy(user, ticker, sharenum):
     sql = "UPDATE account SET shareprice = ? WHERE ticker = 'CASH' and userid = ?"
     cursor.execute(sql, updateValues)
     conn.commit()
-        print("You successfully purchased "+str(share_num)+" share(s) of "+ticker+" @ $"+str(market_price)+" 
-per share")
-    fh.write(user+" bought "+str(share_num)+" share(s) of "+ticker+" @ $"+str(market_price))
-    #logging.info('test')
+    print("You successfully purchased "+str(share_num)+" share(s) of " \
+        +ticker+" @ $"+str(market_price)+" per share")
+    fh.write(user+" bought "+str(share_num)+" share(s) of "+ticker+" @ $"+str(market_price)+"\n")
+    
 
 def sell(user, ticker, share_num):
     sql = """select Ticker, SharePrice,ShareNum from account where userid = ? and ticker = ?"""
@@ -74,8 +78,8 @@ def sell(user, ticker, share_num):
     cursor.execute(update,[(SharePrice_new),(shares_left),(user),(ticker)])
     conn.commit()
     print("You have: ",str(helpers.querySharenum(user,ticker)) + " shares left.")
-    fh.write(user+" sold "+str(share_num)+" share(s) of "+ticker+" @ $"+str(market_price))
-#logging.('SOLD: %s share(s) of %s @ $%s', share_num, ticker, market_price)
+    fh.write(user+" sold "+str(share_num)+" share(s) of "+ticker+" @ $"+str(market_price)+"\n")
+    #logging.('SOLD: %s share(s) of %s @ $%s', share_num, ticker, market_price)
 
 #UI
 user = input("Enter a user name: ").strip(' ').lower()
@@ -105,6 +109,7 @@ if option == '2':
         ticker = input("Enter ticker symbol: ").strip().upper()
         if ticker in stock_options:
             break
+    # price() returns float
     market_price = price(ticker)
     print("Current market value: "+ str(market_price))
     #Make sure user has enough cash
@@ -119,13 +124,14 @@ if option == '2':
 #option SELL
 elif option =='3': 
     tickerDB = helpers.queryTickers(user);        
-    print("You own shares of :", tickerDB)
+    print("You owe shares of :", tickerDB)
     while True:
         ticker = input("Enter ticker symbol: ").strip()
         #probably should make sure user does not select cash
         if ticker in tickerDB and ticker:
             break;     
     sharenumDB = helpers.querySharenum(user,ticker)   
+    print("You have: " + str(sharenumDB) + " shares.")
     while True:    
         share_num = input("Enter number of shares to sell: ").strip(' ') 
         #Make sure user has enough shares to sell 

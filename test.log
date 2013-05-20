@@ -1,0 +1,9 @@
+DEBUG:root:This message should go to the log file
+INFO:root:So should this
+WARNING:root:And this, too
+DEBUG:root:Testing logging
+05/20/2013 11:31:42 AM This message should go to the log file
+05/20/2013 11:31:42 AM So should this
+05/20/2013 11:31:42 AM And this, too
+05/20/2013 11:31:49 AM test
+05/20/2013 11:31:49 AM I told you so!
