@@ -6,6 +6,7 @@ from helpers import menu
 DB = "portfolio.db"
 conn = sqlite3.connect(DB)
 cursor = conn.cursor()
+fh = open('portfolio.log', 'a')
 
 def price(ticker):
     url = 'http://download.finance.yahoo.com/d/quotes.csv?s='+ticker+'&f=nsl1op&e=.csv'
@@ -18,46 +19,44 @@ def price(ticker):
         else:
             market_price = line.split(',')
             return float(market_price[2])
-        
-def buy(user, ticker, share_num):
-    sql = """select SharePrice from account where userid = ? and ticker = 'CASH'"""
-    cursor.execute(sql, [(user)])
-    cash_value = cursor.fetchall()
-    cash_value = cash_value[0][0]
-    market_price = price(ticker)
-    #Make sure user user has enough cash
-    purchase_cost = float(market_price) * float(share_num)
-    if float(cash_value) >= purchase_cost:
-        #If user already owns stock use update, if new stock then insert        
-        sql = "SELECT shareprice, sharenum  FROM account where UserID =? and ticker = ?"
-        cursor.execute(sql, [(user), (ticker)])
-        hasTickerAlready = cursor.fetchall()
-        if  hasTickerAlready:
-            #update amount of shares and average share price
-            prior_share_price = float(hasTickerAlready[0][0])
-            prior_share_num = int(hasTickerAlready[0][1])
-            new_share_num = int(prior_share_num) + int(share_num)
-            new_share_price = ((prior_share_price*prior_share_num) + (market_price * share_num)) / (new_share_num) 
-            updateValues = [new_share_price, new_share_num, user, ticker]
-            sql = "UPDATE account SET shareprice = ?,  sharenum =?  WHERE userid = ? and ticker = ?"
-            cursor.execute(sql, updateValues)
-            conn.commit()
-        else:
-            #insert new ticker
-            insertValues = [user, ticker, market_price, share_num]
-            sql = "INSERT INTO account VALUES (?,?,?,?)"
-            cursor.execute(sql, insertValues)
-            conn.commit()
-        #Deduct total share cost from cash value
-            new_cash_value = cash_value - purchase_cost
-            updateValues = [new_cash_value, user]
-            sql = "UPDATE account SET shareprice = ? WHERE ticker = 'CASH' and userid = ?"
-            cursor.execute(sql, updateValues)
-            conn.commit()
-        print("You successfully purchased "+str(share_num)+" share(s) of "+ticker+" @ $"+str(market_price)+" per share")
-    else:
-        print("You only have $", cash_value)
 
+def viewHolding(user):
+    portfolio = helpers.queryHoldings
+    for ticker in portfolio:
+        print(portfolio[ticker])
+
+def buy(user, ticker, sharenum):
+    market_price = price(ticker)
+    userStocks = helpers.queryTickers(user)   
+    #update amount of shares and average share price
+    if ticker in userStocks:
+        values = helpers.queryPriorStock(user, ticker)        
+        prior_shareprice = float(values[0])
+        prior_sharenum = int(values[1])
+        new_sharenum = prior_sharenum + share_num
+        new_shareprice = ((prior_shareprice*prior_sharenum) + (market_price * sharenum)) / (new_sharenum) 
+        updateValues = [new_shareprice, new_sharenum, user, ticker]
+        sql = "UPDATE account SET shareprice = ?,  sharenum =?  WHERE userid = ? and ticker = ?"
+        cursor.execute(sql, updateValues)
+        conn.commit()
+    else:
+            #insert new ticker
+        insertValues = [user, ticker, market_price, sharenum]
+        sql = "INSERT INTO account VALUES (?,?,?,?)"
+        cursor.execute(sql, insertValues)
+        conn.commit()
+    #Deduct total share cost from cash value
+    cash = helpers.queryCash(user)
+    cost = sharenum * market_price
+    new_cash = cash - cost
+    updateValues = [new_cash, user]
+    sql = "UPDATE account SET shareprice = ? WHERE ticker = 'CASH' and userid = ?"
+    cursor.execute(sql, updateValues)
+    conn.commit()
+        print("You successfully purchased "+str(share_num)+" share(s) of "+ticker+" @ $"+str(market_price)+" 
+per share")
+    fh.write(user+" bought "+str(share_num)+" share(s) of "+ticker+" @ $"+str(market_price))
+    #logging.info('test')
 
 def sell(user, ticker, share_num):
     sql = """select Ticker, SharePrice,ShareNum from account where userid = ? and ticker = ?"""
@@ -75,10 +74,11 @@ def sell(user, ticker, share_num):
     cursor.execute(update,[(SharePrice_new),(shares_left),(user),(ticker)])
     conn.commit()
     print("You have: ",str(helpers.querySharenum(user,ticker)) + " shares left.")
-
+    fh.write(user+" sold "+str(share_num)+" share(s) of "+ticker+" @ $"+str(market_price))
+#logging.('SOLD: %s share(s) of %s @ $%s', share_num, ticker, market_price)
 
 #UI
-user = input("Enter a user name: ").lower()
+user = input("Enter a user name: ").strip(' ').lower()
 sql = "SELECT UserID  FROM account where UserID =?"
 cursor.execute(sql, [(user)])
 usernameExists = cursor.fetchall()
@@ -87,38 +87,43 @@ if not usernameExists:
     cursor.execute('INSERT INTO account VALUES (?,?,?,?)', item)
     conn.commit()
     print("Welcome "+user+". $50,000 was deposited into your account")
-else:
-    print("Welcome back")
 
 menu()
 option = input("Your choice: ").strip(' ')
 
-#VIEW
+#VIEWS
+if option == '1':
+    viewHolding(user)
 
-#BUY
+#option BUY
 if option == '2':
     stock_options = ['GOOG','AAPL','IBM','VTI','VNQ','TSLA']
+    cash = helpers.queryCash(user)
+    print("You have $",cash," to spend")
     print("You can buy the following stocks: ",stock_options)
     while True:
         ticker = input("Enter ticker symbol: ").strip().upper()
         if ticker in stock_options:
-            break 
-    print("Current market value: "+ str(price(ticker)))
-    cashDB = helpers.queryCash(user)
+            break
+    market_price = price(ticker)
+    print("Current market value: "+ str(market_price))
+    #Make sure user has enough cash
     while True:
         share_num = int(input("Enter number of shares to purchase: ").strip(' ')) 
-        if cashDB < (share_num * market_price):
+        if cash < (share_num * market_price):
             print("Not enough cash. Buy less shares.")
         else:
             break
     buy(user, ticker, share_num)
 
-#SELL
+#option SELL
 elif option =='3': 
     tickerDB = helpers.queryTickers(user);        
+    print("You own shares of :", tickerDB)
     while True:
         ticker = input("Enter ticker symbol: ").strip()
-        if ticker in tickerDB:
+        #probably should make sure user does not select cash
+        if ticker in tickerDB and ticker:
             break;     
     sharenumDB = helpers.querySharenum(user,ticker)   
     while True:    
@@ -130,4 +135,3 @@ elif option =='3':
     sell(user,ticker,share_num)
 
 conn.close()
-

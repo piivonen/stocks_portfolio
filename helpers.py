@@ -18,10 +18,22 @@ def querySharenum(user,ticker):
     return sharenum[0][0]
 
 def queryCash(user):
-    sql = """select ShareNum from account where userid = ? and Ticker = 'CASH'"""
+    sql = """select SharePrice from account where userid = ? and Ticker = 'CASH'"""
     cursor.execute(sql, [(user)])
     cash_value = cursor.fetchall()
     return cash_value[0][0]
+
+def queryPriorStock(user,ticker):
+    sql = """select SharePrice, ShareNum from account where userid = ? and Ticker = ?"""
+    cursor.execute(sql, [(user),(ticker)])
+    prior_stock = cursor.fetchall()
+    return prior_stock[0]
+
+def queryHoldings(user):
+    sql = """SELECT Ticker, SharePrice, ShareNum from account where userid  = ?"""
+    cursor.execute(sql, [(user)])
+    holdings = cursor.fetchall()
+    return holdings
 
 #  print options
 def menu():
