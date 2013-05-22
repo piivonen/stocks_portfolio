@@ -1,8 +1,19 @@
+import sys
 import sqlite3
 import urllib.request
 import helpers
 from helpers import menu
 import logging
+from collections import defaultdict
+
+command, sysval = sys.argv[0], sys.argv[1:]
+if sysval:
+    USAGE = """USAGE: Enter {} to access your Python Portfolio. 
+New users will have $50,000 deposited into a new account. Brokerage options include buying and selling securites as well as viewing your current portfolio value based on market price.""".format(command)
+    print("")
+    print(USAGE)
+    print ("DISCLAIMER: All transactions are logged")
+    print("")
 
 DB = "portfolio.db"
 conn = sqlite3.connect(DB)
@@ -87,7 +98,7 @@ sql = "SELECT UserID  FROM account where UserID =?"
 cursor.execute(sql, [(user)])
 usernameExists = cursor.fetchall()
 if not usernameExists:
-    item = [user, 'CASH',500000,1]
+    item = [user, 'CASH',50000,1]
     cursor.execute('INSERT INTO account VALUES (?,?,?,?)', item)
     conn.commit()
     print("Welcome "+user+". $50,000 was deposited into your account")
@@ -97,7 +108,14 @@ option = input("Your choice: ").strip(' ')
 
 #VIEWS
 if option == '1':
-    viewHolding(user)
+    holdings = helpers.queryHoldings(user)
+    hold_dict = defaultdict(list)
+    for tkr, amt, num in holdings:
+        hold_dict[tkr].append(amt)
+        hold_dict[tkr].append(num)
+        hold_dict[tkr].append(amt*num)
+        hold_dict[tkr].append(price(tkr)*num)
+    print(hold_dict)
 
 #option BUY
 if option == '2':
